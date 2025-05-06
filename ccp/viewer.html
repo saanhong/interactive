@@ -58,7 +58,7 @@
     <button id="prev">←</button>
     <span id="page-num">1</span> / <span id="total-pages">?</span>
     <button id="next">→</button>
-    <a href="../index.html"><button>🏠 Home</button></a>
+    <button id="go-home">🏠 Home</button> <!-- 1페이지로 이동 -->
   </div>
 
   <script src="../pdf.mjs" type="module"></script>
@@ -100,6 +100,7 @@
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
     const pageNumSpan = document.getElementById('page-num');
+    const homeBtn = document.getElementById('go-home');
 
     function scrollToPage(page) {
       const pageWidth = viewerDiv.clientWidth;
@@ -114,6 +115,10 @@
 
     nextBtn.addEventListener('click', () => {
       if (currentPage < totalPages) scrollToPage(currentPage + 1);
+    });
+
+    homeBtn.addEventListener('click', () => {
+      scrollToPage(1);
     });
 
     viewerDiv.addEventListener('scroll', () => {
