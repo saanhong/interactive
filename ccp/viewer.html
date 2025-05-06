@@ -6,9 +6,9 @@
   <link rel="stylesheet" href="../viewer.css">
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      overflow-x: hidden;
+      margin: 0; padding: 0;
+      overflow: hidden;
+      font-family: sans-serif;
     }
     #pdf-viewer {
       display: flex;
@@ -19,31 +19,63 @@
     }
     .page {
       scroll-snap-align: start;
-      flex: 0 0 auto;
-      width: 100vw;
+      flex: 0 0 100vw;
       display: flex;
       justify-content: center;
       align-items: center;
+      position: relative;
     }
     canvas {
       max-height: 100vh;
       height: auto;
     }
+    #controls {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      background: rgba(255,255,255,0.8);
+      padding: 8px 12px;
+      border-radius: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #controls button {
+      font-size: 18px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    #controls span {
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <div id="pdf-viewer"></div>
+  <div id="controls">
+    <button id="prev">←</button>
+    <span id="page-num">1</span> / <span id="total-pages">?</span>
+    <button id="next">→</button>
+    <a href="../index.html"><button>🏠 Home</button></a>
+  </div>
 
   <script src="../pdf.mjs" type="module"></script>
   <script type="module">
     import * as pdfjsLib from "../pdf.mjs";
     pdfjsLib.GlobalWorkerOptions.workerSrc = "../pdf.worker.mjs";
 
+    const viewer = document.getElementById('pdf-viewer');
+    let currentPage = 1;
+    let totalPages = 0;
+
     const loadingTask = pdfjsLib.getDocument('./CCP_web.pdf');
     loadingTask.promise.then(function(pdf) {
-      const viewer = document.getElementById('pdf-viewer');
+      totalPages = pdf.numPages;
+      document.getElementById('total-pages').textContent = totalPages;
 
-      for (let i = 1; i <= pdf.numPages; i++) {
+      for (let i = 1; i <= totalPages; i++) {
         pdf.getPage(i).then(function(page) {
           const scale = 1.5;
           const viewport = page.getViewport({ scale });
@@ -60,6 +92,35 @@
 
           page.render({ canvasContext: context, viewport });
         });
+      }
+    });
+
+    // Navigation
+    const viewerDiv = document.getElementById('pdf-viewer');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const pageNumSpan = document.getElementById('page-num');
+
+    function scrollToPage(page) {
+      const pageWidth = viewerDiv.clientWidth;
+      viewerDiv.scrollTo({ left: pageWidth * (page - 1), behavior: 'smooth' });
+      pageNumSpan.textContent = page;
+      currentPage = page;
+    }
+
+    prevBtn.addEventListener('click', () => {
+      if (currentPage > 1) scrollToPage(currentPage - 1);
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (currentPage < totalPages) scrollToPage(currentPage + 1);
+    });
+
+    viewerDiv.addEventListener('scroll', () => {
+      const index = Math.round(viewerDiv.scrollLeft / viewerDiv.clientWidth) + 1;
+      if (index !== currentPage) {
+        currentPage = index;
+        pageNumSpan.textContent = currentPage;
       }
     });
   </script>
