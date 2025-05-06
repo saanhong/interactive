@@ -1,95 +1,133 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>가로 넘김 PDF 뷰어</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        overflow-x: scroll;
-        overflow-y: hidden;
-        height: 100vh;
-        width: 100vw;
-        touch-action: pan-x;
-        background: #000;
-      }
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Composition of De-Centrality</title>
+  <link rel="stylesheet" href="../viewer.css">
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    #pdf-viewer {
+      display: flex;
+      flex-direction: row;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      height: 100vh;
+    }
+    .page {
+      scroll-snap-align: start;
+      flex: 0 0 100vw;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    canvas {
+      max-height: 100vh;
+      height: auto;
+    }
+    #controls {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      background: rgba(255,255,255,0.8);
+      padding: 8px 12px;
+      border-radius: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #controls button {
+      font-size: 18px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    #controls span {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="pdf-viewer"></div>
+  <div id="controls">
+    <button id="prev">←</button>
+    <span id="page-num">1</span> / <span id="total-pages">?</span>
+    <button id="next">→</button>
+    <button id="go-home">🏠 Home</button> <!-- 1페이지로 이동 -->
+  </div>
 
-      #viewerContainer {
-        width: max-content;
-        height: 100vh;
-        white-space: nowrap;
-        overflow-x: auto;
-        overflow-y: hidden;
-        display: flex;
-        align-items: center;
-      }
+  <script src="../pdf.mjs" type="module"></script>
+  <script type="module">
+    import * as pdfjsLib from "../pdf.mjs";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "../pdf.worker.mjs";
 
-      canvas {
-        height: 100vh !important;
-        width: auto !important;
-        margin-right: 8px;
-        background: white;
-      }
+    const viewer = document.getElementById('pdf-viewer');
+    let currentPage = 1;
+    let totalPages = 0;
 
-      #homeButton {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        z-index: 100;
-        background: rgba(255, 255, 255, 0.9);
-        border: none;
-        padding: 8px 12px;
-        font-size: 14px;
-        cursor: pointer;
-      }
-    </style>
-  </head>
-  <body>
-    <button id="homeButton" onclick="goToFirstPage()">Home</button>
-    <div id="viewerContainer"></div>
+    const loadingTask = pdfjsLib.getDocument('./CCP_web.pdf');
+    loadingTask.promise.then(function(pdf) {
+      totalPages = pdf.numPages;
+      document.getElementById('total-pages').textContent = totalPages;
 
-    <script src="../pdf.mjs" type="module"></script>
-    <script type="module">
-      import { getDocument } from "../pdf.mjs";
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.getPage(i).then(function(page) {
+          const scale = 1.5;
+          const viewport = page.getViewport({ scale });
 
-      const url = "CCP_web.pdf";
-      const container = document.getElementById("viewerContainer");
-
-      function renderPage(pdf, num) {
-        pdf.getPage(num).then(page => {
-          const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d");
-          const viewport = page.getViewport({ scale: 1.5 });
-
-          canvas.height = viewport.height;
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
           canvas.width = viewport.width;
+          canvas.height = viewport.height;
 
-          page.render({ canvasContext: context, viewport }).promise.then(() => {
-            container.appendChild(canvas);
-          });
+          const container = document.createElement('div');
+          container.className = 'page';
+          container.appendChild(canvas);
+          viewer.appendChild(container);
+
+          page.render({ canvasContext: context, viewport });
         });
       }
+    });
 
-      function goToFirstPage() {
-        container.scrollTo({ left: 0, behavior: "smooth" });
+    // Navigation
+    const viewerDiv = document.getElementById('pdf-viewer');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const pageNumSpan = document.getElementById('page-num');
+    const homeBtn = document.getElementById('go-home');
+
+    function scrollToPage(page) {
+      const pageWidth = viewerDiv.clientWidth;
+      viewerDiv.scrollTo({ left: pageWidth * (page - 1), behavior: 'smooth' });
+      pageNumSpan.textContent = page;
+      currentPage = page;
+    }
+
+    prevBtn.addEventListener('click', () => {
+      if (currentPage > 1) scrollToPage(currentPage - 1);
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (currentPage < totalPages) scrollToPage(currentPage + 1);
+    });
+
+    homeBtn.addEventListener('click', () => {
+      scrollToPage(1);
+    });
+
+    viewerDiv.addEventListener('scroll', () => {
+      const index = Math.round(viewerDiv.scrollLeft / viewerDiv.clientWidth) + 1;
+      if (index !== currentPage) {
+        currentPage = index;
+        pageNumSpan.textContent = currentPage;
       }
-
-      getDocument(url).promise.then(pdf => {
-        for (let i = 1; i <= pdf.numPages; i++) {
-          renderPage(pdf, i);
-        }
-      });
-
-      // 가로모드 권장 알림
-      function checkOrientation() {
-        if (window.innerHeight > window.innerWidth) {
-          alert("더 나은 사용을 위해 가로모드로 전환해주세요.");
-        }
-      }
-      window.addEventListener("load", checkOrientation);
-      window.addEventListener("resize", checkOrientation);
-    </script>
-  </body>
+    });
+  </script>
+</body>
 </html>
